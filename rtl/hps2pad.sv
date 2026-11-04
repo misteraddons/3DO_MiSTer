@@ -161,7 +161,10 @@ module HPS2PAD (
 	};
 	
 	//arcade control
-	wire [31:0] arcade_silli = {8'hC0, 8'h00, {1'b0, 1'b0, joystick_0[12], joystick_1[12], 1'b0, joystick_1[11], joystick_0[11], ARCADE_SERVICE}, 8'h00};
+	// Accept pad Play/Stop alongside the existing arcade Start/Coin bindings.
+	wire [1:0] arcade_start = {joystick_1[11] | joystick_1[7], joystick_0[11] | joystick_0[7]};
+	wire [1:0] arcade_coin = {joystick_1[12] | joystick_1[8], joystick_0[12] | joystick_0[8]};
+	wire [31:0] arcade_silli = {8'hC0, 8'h00, {1'b0, 1'b0, arcade_coin[0], arcade_coin[1], 1'b0, arcade_start[1], arcade_start[0], ARCADE_SERVICE}, 8'h00};
 	wire [31:0] arcade_tb = {
 		8'h49,
 		1'b0,
