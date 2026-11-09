@@ -428,6 +428,7 @@ module emu
 	wire cdd_data_download = ioctl_download & (ioctl_index[5:2] == 4'b0010);
 	wire cdd_info_download = ioctl_download & (ioctl_index[5:2] == 4'b0011);
 	wire save_download = ioctl_download & (ioctl_index[5:2] == 4'b0001);
+	wire arcade_id_download = ioctl_download & (ioctl_index == 8'd16);
 	
 	reg osd_btn = 0;
 //	always @(posedge clk_sys) begin
@@ -539,33 +540,20 @@ module emu
 	reg  [ 3: 0] BRAM2_OFFS;//Block 0x20000
 	reg  [ 3: 0] BRAM1_OFFS;//Block 0x10000
 	reg          NEED_DSP_PAUSE;
+	// Arcade game ID, sent by the MRA as a one-byte ROM on ioctl index 16.
+	// 0 = console (no MRA), 1 = Orbatak, 2 = Shootout at Old Tucson, 3 = Mad Dog II.
+	// Loading an MRA reloads the FPGA, so the ID stays 0 for console launches.
 	localparam [1:0] ARCADE_TRACKBALL = 2'd1, ARCADE_SHOOTOUT = 2'd2, ARCADE_MAD_DOG_II = 2'd3;
-	localparam [31:0] ORBATAK_DISC_ID = 32'h165425BD;
-	localparam [31:0] SHOOTOUT_DISC_ID = 32'h31BC5129, MAD_DOG_II_DISC_ID = 32'h124C4B90;
 	reg    [1:0] arcade_sel = 0;
-	reg    [1:0] arcade_id_seen = 0;
 	wire         arcade_active = |arcade_sel;
 	wire         arcade_trackball = (arcade_sel == ARCADE_TRACKBALL);
 	wire         arcade_lightgun = (arcade_sel == ARCADE_SHOOTOUT || arcade_sel == ARCADE_MAD_DOG_II);
 	always @(posedge clk_sys) begin
+		if (arcade_id_download && ioctl_wr && !ioctl_addr) arcade_sel <= ioctl_data[1:0];
+	end
+
+	always @(posedge clk_sys) begin
 		reg [31: 0] msf,id;
-
-		if (RESET || !cdd_info_download) arcade_id_seen <= 0;
-		else if (ioctl_wr) begin
-			if (ioctl_addr == 25'h458) arcade_id_seen[1] <= 1;
-			if (ioctl_addr == 25'h45A) arcade_id_seen[0] <= 1;
-		end
-
-		// Main starts disc changes and ejects by unmounting the save on index 4.
-		if (RESET || save_download) arcade_sel <= 0;
-		else if (cdd_info_download && ioctl_wr && ioctl_addr == 25'h7FE) begin
-			case ((&arcade_id_seen) ? id : 32'd0)
-				ORBATAK_DISC_ID: arcade_sel <= ARCADE_TRACKBALL;
-				SHOOTOUT_DISC_ID: arcade_sel <= ARCADE_SHOOTOUT;
-				MAD_DOG_II_DISC_ID: arcade_sel <= ARCADE_MAD_DOG_II;
-				default: arcade_sel <= 0;
-			endcase
-		end
 
 		if (cdd_info_download && ioctl_wr) begin
 			if (ioctl_addr == 25'h004) begin
